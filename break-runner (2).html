@@ -1,0 +1,2008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Break Runner</title>
+
+<!-- THREE.JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<style>
+
+/* =====================================================
+   CSS — APPEARANCE / LAYOUT
+===================================================== */
+
+* {
+    box-sizing: border-box;
+    user-select: none;
+}
+
+html,
+body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #07111f;
+    color: white;
+}
+
+#game {
+    position: fixed;
+    inset: 0;
+}
+
+canvas {
+    display: block;
+}
+
+/* ---------------- HUD ---------------- */
+
+#hud {
+    position: fixed;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    z-index: 10;
+
+    display: flex;
+    gap: 30px;
+
+    text-align: center;
+
+    pointer-events: none;
+}
+
+.stat {
+    min-width: 65px;
+}
+
+.statLabel {
+    display: block;
+    font-size: 10px;
+    opacity: 0.55;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.statValue {
+    display: block;
+    font-size: 21px;
+    font-weight: bold;
+}
+
+/* ---------------- CONTROLS ---------------- */
+
+#controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    z-index: 10;
+
+    display: flex;
+    gap: 10px;
+}
+
+.control {
+    width: 55px;
+    height: 55px;
+
+    border: none;
+    border-radius: 50%;
+
+    background: rgba(255,255,255,0.15);
+    color: white;
+
+    font-size: 22px;
+
+    cursor: pointer;
+
+    backdrop-filter: blur(5px);
+}
+
+.control:active {
+    transform: scale(.9);
+}
+
+/* ---------------- OVERLAYS ---------------- */
+
+.overlay {
+    position: fixed;
+    inset: 0;
+
+    z-index: 50;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    background: rgba(0,0,0,.72);
+}
+
+.hidden {
+    display: none !important;
+}
+
+.card {
+    width: min(420px, 90vw);
+
+    padding: 35px;
+
+    border-radius: 22px;
+
+    text-align: center;
+
+    background: #101c2d;
+
+    box-shadow:
+        0 20px 80px rgba(0,0,0,.5);
+}
+
+.breakCard {
+    background: black;
+}
+
+.smallTitle {
+    font-size: 10px;
+    letter-spacing: 3px;
+    opacity: .5;
+    margin-bottom: 12px;
+}
+
+h1 {
+    margin: 0 0 12px;
+    font-size: 34px;
+}
+
+p {
+    font-size: 14px;
+    line-height: 1.5;
+    opacity: .7;
+}
+
+button.mainButton {
+    border: none;
+
+    padding: 14px 30px;
+
+    border-radius: 12px;
+
+    background: white;
+    color: #111;
+
+    font-size: 16px;
+    font-weight: bold;
+
+    cursor: pointer;
+
+    margin-top: 15px;
+}
+
+button.mainButton:active {
+    transform: scale(.96);
+}
+
+/* ---------------- CLICK BREAK ---------------- */
+
+#clickButton {
+    min-width: 170px;
+    font-size: 18px;
+}
+
+#clickCounter {
+    margin-top: 12px;
+    font-size: 13px;
+    opacity: .55;
+}
+
+/* ---------------- DRAG BREAK ---------------- */
+
+.progressOuter {
+    width: 100%;
+    height: 12px;
+
+    margin: 25px 0 12px;
+
+    border-radius: 20px;
+
+    background: #29364b;
+
+    overflow: hidden;
+}
+
+#dragProgress {
+    width: 0%;
+    height: 100%;
+
+    background: white;
+}
+
+#dragTimer {
+    font-size: 26px;
+    font-weight: bold;
+}
+
+#dragMessage {
+    font-size: 13px;
+    opacity: .55;
+}
+
+/* ---------------- GAME OVER ---------------- */
+
+#gameOverStats {
+    font-size: 15px;
+}
+
+</style>
+</head>
+
+
+<body>
+
+<!-- =====================================================
+     HTML — GAME CONTAINER
+===================================================== -->
+
+<div id="game"></div>
+
+
+<!-- =====================================================
+     HTML — HUD
+===================================================== -->
+
+<div id="hud">
+
+    <div class="stat">
+        <span class="statLabel">Score</span>
+        <span class="statValue" id="score">0</span>
+    </div>
+
+    <div class="stat">
+        <span class="statLabel">Coins</span>
+        <span class="statValue" id="coins">0</span>
+    </div>
+
+    <div class="stat">
+        <span class="statLabel">Best</span>
+        <span class="statValue" id="best">0</span>
+    </div>
+
+    <div class="stat">
+        <span class="statLabel">Time</span>
+        <span class="statValue" id="time">0:00</span>
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     HTML — MOBILE / MOUSE CONTROLS
+===================================================== -->
+
+<div id="controls">
+
+    <button class="control" id="leftButton">←</button>
+
+    <button class="control" id="jumpButton">↑</button>
+
+    <button class="control" id="slideButton">↓</button>
+
+    <button class="control" id="rightButton">→</button>
+
+</div>
+
+
+<!-- =====================================================
+     START SCREEN
+===================================================== -->
+
+<div id="startScreen" class="overlay">
+
+    <div class="card">
+
+        <div class="smallTitle">
+            BREAK RUNNER
+        </div>
+
+        <h1>Ready?</h1>
+
+        <p>
+            Dodge obstacles, collect coins,
+            and see how high you can score.
+        </p>
+
+        <button class="mainButton" id="startButton">
+            START
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     CLICK BREAK
+===================================================== -->
+
+<div id="clickScreen" class="overlay hidden">
+
+    <div class="card breakCard">
+
+        <div class="smallTitle">
+            QUICK BREAK
+        </div>
+
+        <h1>Pause.</h1>
+
+        <p>
+            Click the button 35 times to continue.
+        </p>
+
+        <button class="mainButton" id="clickButton">
+            CLICK
+        </button>
+
+        <div id="clickCounter">
+            0 / 35
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     DRAG BREAK
+===================================================== -->
+
+<div id="dragScreen" class="overlay hidden">
+
+    <div class="card">
+
+        <div class="smallTitle">
+            30 SECOND BREAK
+        </div>
+
+        <h1>Move around.</h1>
+
+        <div class="progressOuter">
+
+            <div id="dragProgress"></div>
+
+        </div>
+
+        <div id="dragTimer">
+            30s
+        </div>
+
+        <div id="dragMessage">
+            Click START when you're ready.
+        </div>
+
+        <button class="mainButton" id="startDrag">
+            START
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     GAME OVER
+===================================================== -->
+
+<div id="gameOver" class="overlay hidden">
+
+    <div class="card">
+
+        <div class="smallTitle">
+            RUN OVER
+        </div>
+
+        <h1>Nice run.</h1>
+
+        <p id="gameOverStats"></p>
+
+        <button class="mainButton" id="restartButton">
+            RUN AGAIN
+        </button>
+
+    </div>
+
+</div>
+
+
+<script>
+
+/* =====================================================
+   JAVASCRIPT — 3D WORLD
+===================================================== */
+
+const gameContainer = document.getElementById("game");
+
+
+/* ---------------- THREE.JS SETUP ---------------- */
+
+const scene = new THREE.Scene();
+
+scene.background = new THREE.Color(0x07111f);
+
+scene.fog = new THREE.Fog(
+    0x07111f,
+    25,
+    100
+);
+
+
+const camera = new THREE.PerspectiveCamera(
+    62,
+    window.innerWidth / window.innerHeight,
+    .1,
+    250
+);
+
+camera.position.set(
+    0,
+    4.2,
+    8.5
+);
+
+
+const renderer = new THREE.WebGLRenderer({
+    antialias: true
+});
+
+renderer.setPixelRatio(
+    Math.min(window.devicePixelRatio, 2)
+);
+
+renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+);
+
+renderer.shadowMap.enabled = true;
+
+gameContainer.appendChild(
+    renderer.domElement
+);
+
+
+/* =====================================================
+   LIGHTING
+===================================================== */
+
+const skyLight =
+    new THREE.HemisphereLight(
+        0xbddcff,
+        0x182238,
+        1.3
+    );
+
+scene.add(skyLight);
+
+
+const sun =
+    new THREE.DirectionalLight(
+        0xffffff,
+        1.2
+    );
+
+sun.position.set(
+    5,
+    12,
+    8
+);
+
+sun.castShadow = true;
+
+scene.add(sun);
+
+
+/* =====================================================
+   ROAD
+===================================================== */
+
+const roadMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x17263b,
+        roughness: 1
+    });
+
+
+const road =
+    new THREE.Mesh(
+        new THREE.PlaneGeometry(
+            10,
+            500
+        ),
+        roadMaterial
+    );
+
+road.rotation.x =
+    -Math.PI / 2;
+
+road.position.z = -220;
+
+road.receiveShadow = true;
+
+scene.add(road);
+
+
+/* ---------------- SIDE AREAS ---------------- */
+
+const sideMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x223a54
+    });
+
+
+for (const x of [-6.2, 6.2]) {
+
+    const side =
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                2,
+                .15,
+                500
+            ),
+            sideMaterial
+        );
+
+    side.position.set(
+        x,
+        -.02,
+        -220
+    );
+
+    scene.add(side);
+
+}
+
+
+/* ---------------- LANE LINES ---------------- */
+
+const laneMaterial =
+    new THREE.MeshBasicMaterial({
+        color: 0xb8c9dc,
+        transparent: true,
+        opacity: .25
+    });
+
+
+for (const x of [-1.55, 1.55]) {
+
+    const line =
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                .04,
+                .025,
+                500
+            ),
+            laneMaterial
+        );
+
+    line.position.set(
+        x,
+        .02,
+        -220
+    );
+
+    scene.add(line);
+
+}
+
+
+/* =====================================================
+   PLAYER — VISIBLE 3D BALL
+===================================================== */
+
+const player =
+    new THREE.Group();
+
+
+const ballMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: .3,
+        metalness: .05
+    });
+
+
+const ball =
+    new THREE.Mesh(
+        new THREE.SphereGeometry(
+            .65,
+            32,
+            24
+        ),
+        ballMaterial
+    );
+
+ball.position.y = .72;
+
+ball.castShadow = true;
+
+player.add(ball);
+
+
+/* ---------------- BALL PANEL ---------------- */
+
+const panelMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x182334,
+        roughness: .45
+    });
+
+
+const panel =
+    new THREE.Mesh(
+        new THREE.TorusGeometry(
+            .35,
+            .06,
+            12,
+            28
+        ),
+        panelMaterial
+    );
+
+panel.rotation.x =
+    Math.PI / 2;
+
+panel.position.y = .72;
+
+player.add(panel);
+
+
+/* ---------------- BALL SHADOW ---------------- */
+
+const shadow =
+    new THREE.Mesh(
+        new THREE.CircleGeometry(
+            .7,
+            32
+        ),
+        new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: .3
+        })
+    );
+
+shadow.rotation.x =
+    -Math.PI / 2;
+
+shadow.position.y = .025;
+
+player.add(shadow);
+
+
+player.position.set(
+    0,
+    0,
+    1
+);
+
+scene.add(player);
+
+
+/* =====================================================
+   GAME VARIABLES
+===================================================== */
+
+const lanes = [
+    -3.1,
+    0,
+    3.1
+];
+
+let currentLane = 1;
+
+let targetX = 0;
+
+let speed = 22;
+
+let score = 0;
+
+let coins = 0;
+
+let best =
+    Number(localStorage.breakRunnerBest || 0);
+
+let jump = 0;
+
+let slide = 0;
+
+let spawnTimer = 0;
+
+let gameState = "menu";
+
+let runStart = 0;
+
+let sessionStart = null;
+
+let lastTime = performance.now();
+
+let nextBreak = 60000;
+
+
+/* =====================================================
+   OBJECTS
+===================================================== */
+
+const objects = [];
+
+
+/* ---------------- COIN ---------------- */
+
+const coinGeometry =
+    new THREE.TorusGeometry(
+        .27,
+        .09,
+        12,
+        24
+    );
+
+
+const coinMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0xffd84d,
+        emissive: 0x654900,
+        metalness: .4
+    });
+
+
+function createCoin(
+    laneIndex,
+    z,
+    y = .8
+) {
+
+    const coin =
+        new THREE.Mesh(
+            coinGeometry,
+            coinMaterial
+        );
+
+    coin.position.set(
+        lanes[laneIndex],
+        y,
+        z
+    );
+
+    scene.add(coin);
+
+    objects.push({
+        mesh: coin,
+        type: "coin",
+        lane: laneIndex
+    });
+
+}
+
+
+/* =====================================================
+   OBSTACLES
+===================================================== */
+
+const blockGeometry =
+    new THREE.BoxGeometry(
+        1.25,
+        1.4,
+        1.15
+    );
+
+
+const blockMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0xff5263
+    });
+
+
+const lowGeometry =
+    new THREE.BoxGeometry(
+        1.4,
+        .55,
+        1.1
+    );
+
+
+const lowMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0xffa62e
+    });
+
+
+function createObstacle(
+    laneIndex,
+    z,
+    type
+) {
+
+    let mesh;
+
+    if (type === "low") {
+
+        mesh =
+            new THREE.Mesh(
+                lowGeometry,
+                lowMaterial
+            );
+
+        mesh.position.y = .3;
+
+    } else {
+
+        mesh =
+            new THREE.Mesh(
+                blockGeometry,
+                blockMaterial
+            );
+
+        mesh.position.y = .7;
+
+    }
+
+    mesh.position.x =
+        lanes[laneIndex];
+
+    mesh.position.z = z;
+
+    mesh.castShadow = true;
+
+    scene.add(mesh);
+
+    objects.push({
+        mesh: mesh,
+        type: type,
+        lane: laneIndex
+    });
+
+}
+
+
+/* =====================================================
+   OBSTACLE / COIN PATTERNS
+===================================================== */
+
+function spawnPattern() {
+
+    const random =
+        Math.random();
+
+
+    /* COIN TRAIL */
+
+    if (random < .30) {
+
+        const laneIndex =
+            Math.floor(
+                Math.random() * 3
+            );
+
+        for (
+            let i = 0;
+            i < 6;
+            i++
+        ) {
+
+            createCoin(
+                laneIndex,
+                -75 - i * 4
+            );
+
+        }
+
+        return;
+    }
+
+
+    /* TWO BLOCKS + SAFE LANE */
+
+    if (random < .52) {
+
+        const safeLane =
+            Math.floor(
+                Math.random() * 3
+            );
+
+        for (
+            let i = 0;
+            i < 3;
+            i++
+        ) {
+
+            if (i !== safeLane) {
+
+                createObstacle(
+                    i,
+                    -75,
+                    "block"
+                );
+
+            }
+
+        }
+
+        createCoin(
+            safeLane,
+            -80,
+            1
+        );
+
+        return;
+    }
+
+
+    /* LOW OBSTACLE */
+
+    if (random < .72) {
+
+        const laneIndex =
+            Math.floor(
+                Math.random() * 3
+            );
+
+        createObstacle(
+            laneIndex,
+            -75,
+            "low"
+        );
+
+        createCoin(
+            laneIndex,
+            -81,
+            1.5
+        );
+
+        return;
+    }
+
+
+    /* MIXED PATTERN */
+
+    const laneIndex =
+        Math.floor(
+            Math.random() * 3
+        );
+
+
+    createObstacle(
+        laneIndex,
+        -75,
+        "block"
+    );
+
+
+    createCoin(
+        (laneIndex + 1) % 3,
+        -80
+    );
+
+
+    createCoin(
+        (laneIndex + 2) % 3,
+        -85
+    );
+
+}
+
+
+/* =====================================================
+   PLAYER MOVEMENT
+===================================================== */
+
+function moveLeft() {
+
+    if (gameState !== "playing")
+        return;
+
+    currentLane =
+        Math.max(
+            0,
+            currentLane - 1
+        );
+
+    targetX =
+        lanes[currentLane];
+}
+
+
+function moveRight() {
+
+    if (gameState !== "playing")
+        return;
+
+    currentLane =
+        Math.min(
+            2,
+            currentLane + 1
+        );
+
+    targetX =
+        lanes[currentLane];
+}
+
+
+function jumpNow() {
+
+    if (
+        gameState !== "playing" ||
+        jump > 0 ||
+        slide > 0
+    )
+        return;
+
+    jump = .01;
+}
+
+
+function slideNow() {
+
+    if (
+        gameState !== "playing" ||
+        jump > 0
+    )
+        return;
+
+    slide = .45;
+}
+
+
+/* =====================================================
+   KEYBOARD CONTROLS
+===================================================== */
+
+window.addEventListener(
+    "keydown",
+    function(event) {
+
+        if (
+            event.key === "ArrowLeft" ||
+            event.key.toLowerCase() === "a"
+        ) {
+            moveLeft();
+        }
+
+
+        if (
+            event.key === "ArrowRight" ||
+            event.key.toLowerCase() === "d"
+        ) {
+            moveRight();
+        }
+
+
+        if (
+            event.key === "ArrowUp" ||
+            event.key.toLowerCase() === "w" ||
+            event.code === "Space"
+        ) {
+            jumpNow();
+        }
+
+
+        if (
+            event.key === "ArrowDown" ||
+            event.key.toLowerCase() === "s"
+        ) {
+            slideNow();
+        }
+
+    }
+);
+
+
+/* =====================================================
+   BUTTON CONTROLS
+===================================================== */
+
+document.getElementById(
+    "leftButton"
+).onclick = moveLeft;
+
+
+document.getElementById(
+    "rightButton"
+).onclick = moveRight;
+
+
+document.getElementById(
+    "jumpButton"
+).onclick = jumpNow;
+
+
+document.getElementById(
+    "slideButton"
+).onclick = slideNow;
+
+
+/* =====================================================
+   GAME START
+===================================================== */
+
+function startGame() {
+
+    objects.forEach(
+        object =>
+            scene.remove(
+                object.mesh
+            )
+    );
+
+    objects.length = 0;
+
+
+    score = 0;
+
+    coins = 0;
+
+    speed = 22;
+
+    spawnTimer = 0;
+
+    currentLane = 1;
+
+    targetX = 0;
+
+    player.position.set(
+        0,
+        0,
+        1
+    );
+
+    jump = 0;
+
+    slide = 0;
+
+    runStart =
+        performance.now();
+
+    lastTime =
+        performance.now();
+
+    if (
+        sessionStart === null
+    ) {
+
+        sessionStart =
+            performance.now();
+
+        nextBreak = 60000;
+
+    }
+
+    gameState = "playing";
+
+
+    document.getElementById(
+        "startScreen"
+    ).classList.add("hidden");
+
+
+    document.getElementById(
+        "gameOver"
+    ).classList.add("hidden");
+
+
+    updateHUD();
+
+}
+
+
+/* =====================================================
+   GAME OVER
+===================================================== */
+
+function gameOverScreen() {
+
+    gameState = "gameover";
+
+
+    best =
+        Math.max(
+            best,
+            score
+        );
+
+
+    localStorage.breakRunnerBest =
+        best;
+
+
+    document.getElementById(
+        "best"
+    ).textContent = best;
+
+
+    document.getElementById(
+        "gameOverStats"
+    ).textContent =
+        "Score: " +
+        score +
+        "   •   Coins: " +
+        coins;
+
+
+    document.getElementById(
+        "gameOver"
+    ).classList.remove(
+        "hidden"
+    );
+
+}
+
+
+/* =====================================================
+   BREAK SYSTEM
+===================================================== */
+
+let clickAmount = 0;
+
+
+function startBreak() {
+
+    gameState = "clickBreak";
+
+    clickAmount = 0;
+
+
+    document.getElementById(
+        "clickCounter"
+    ).textContent =
+        "0 / 35";
+
+
+    document.getElementById(
+        "clickScreen"
+    ).classList.remove(
+        "hidden"
+    );
+
+}
+
+
+/* ---------------- 35 CLICKS ---------------- */
+
+document.getElementById(
+    "clickButton"
+).onclick = function() {
+
+    if (
+        gameState !== "clickBreak"
+    )
+        return;
+
+
+    clickAmount++;
+
+
+    document.getElementById(
+        "clickCounter"
+    ).textContent =
+        clickAmount +
+        " / 35";
+
+
+    if (
+        clickAmount >= 35
+    ) {
+
+        document.getElementById(
+            "clickScreen"
+        ).classList.add(
+            "hidden"
+        );
+
+
+        document.getElementById(
+            "dragScreen"
+        ).classList.remove(
+            "hidden"
+        );
+
+
+        gameState =
+            "dragReady";
+    }
+
+};
+
+
+/* =====================================================
+   20 SECOND MOUSE DRAG
+===================================================== */
+
+let dragging = false;
+
+let dragStartTime = 0;
+
+let dragDistance = 0;
+
+
+document.getElementById(
+    "startDrag"
+).onclick = function() {
+
+    if (
+        gameState !== "dragReady"
+    )
+        return;
+
+
+    gameState =
+        "dragging";
+
+
+    dragStartTime =
+        performance.now();
+
+
+    dragDistance = 0;
+
+
+    document.getElementById(
+        "startDrag"
+    ).style.display =
+        "none";
+
+
+};
+
+
+window.addEventListener(
+    "mousedown",
+    function() {
+
+        if (
+            gameState === "dragging"
+        ) {
+
+            dragging = true;
+
+        }
+
+    }
+);
+
+
+window.addEventListener(
+    "mouseup",
+    function() {
+
+        dragging = false;
+
+    }
+);
+
+
+window.addEventListener(
+    "mousemove",
+    function(event) {
+
+        if (
+            gameState === "dragging" &&
+            dragging
+        ) {
+
+            dragDistance +=
+                Math.abs(
+                    event.movementX
+                ) +
+                Math.abs(
+                    event.movementY
+                );
+
+        }
+
+    }
+);
+
+
+/* =====================================================
+   FINISH BREAK
+===================================================== */
+
+function finishBreak() {
+
+    document.getElementById(
+        "dragScreen"
+    ).classList.add(
+        "hidden"
+    );
+
+
+    document.getElementById(
+        "startDrag"
+    ).style.display =
+        "";
+
+
+    document.getElementById(
+        "dragProgress"
+    ).style.width =
+        "0%";
+
+
+    document.getElementById(
+        "dragTimer"
+    ).textContent =
+        "30s";
+
+
+    /* nextBreak is set relative to session-elapsed time
+       (persists across deaths/restarts), 1 minute ahead. */
+
+    const sessionElapsedNow =
+        performance.now() - sessionStart;
+
+    nextBreak =
+        sessionElapsedNow + 60000;
+
+
+    gameState =
+        "playing";
+
+
+    lastTime =
+        performance.now();
+
+}
+
+
+/* =====================================================
+   HUD
+===================================================== */
+
+function updateHUD() {
+
+    document.getElementById(
+        "score"
+    ).textContent =
+        score;
+
+
+    document.getElementById(
+        "coins"
+    ).textContent =
+        coins;
+
+
+    document.getElementById(
+        "best"
+    ).textContent =
+        best;
+
+
+    const elapsed =
+        performance.now() -
+        sessionStart;
+
+
+    const seconds =
+        Math.floor(
+            elapsed / 1000
+        );
+
+
+    const minutes =
+        Math.floor(
+            seconds / 60
+        );
+
+
+    const remaining =
+        String(
+            seconds % 60
+        ).padStart(
+            2,
+            "0"
+        );
+
+
+    document.getElementById(
+        "time"
+    ).textContent =
+        minutes +
+        ":" +
+        remaining;
+
+}
+
+
+/* =====================================================
+   MAIN GAME LOOP
+===================================================== */
+
+function animate(now) {
+
+    requestAnimationFrame(
+        animate
+    );
+
+
+    const delta =
+        Math.min(
+            .05,
+            (now - lastTime) / 1000
+        );
+
+
+    lastTime = now;
+
+
+    /* ---------------------------------------------
+       PLAYING
+    --------------------------------------------- */
+
+    if (
+        gameState === "playing"
+    ) {
+
+        const elapsed =
+            now - runStart;
+
+        const sessionElapsed =
+            now - sessionStart;
+
+
+        /* SPEED INCREASE */
+
+        speed =
+            22 +
+            Math.min(
+                24,
+                elapsed / 10000
+            );
+
+
+        /* SCORE */
+
+        score +=
+            Math.floor(
+                delta *
+                speed *
+                .7
+            );
+
+
+        /* SPAWN */
+
+        spawnTimer +=
+            delta * 1000;
+
+
+        const spawnRate =
+            Math.max(
+                360,
+                850 -
+                elapsed / 180
+            );
+
+
+        if (
+            spawnTimer >
+            spawnRate
+        ) {
+
+            spawnTimer = 0;
+
+            spawnPattern();
+
+        }
+
+
+        /* LANE MOVEMENT */
+
+        player.position.x +=
+            (
+                targetX -
+                player.position.x
+            ) *
+            Math.min(
+                1,
+                delta * 12
+            );
+
+
+        /* JUMP */
+
+        if (
+            jump > 0
+        ) {
+
+            jump +=
+                delta * 2.6;
+
+
+            player.position.y =
+                Math.sin(
+                    jump *
+                    Math.PI
+                ) * 1.5;
+
+
+            ball.rotation.x -=
+                delta * 8;
+
+
+            if (
+                jump >= 1
+            ) {
+
+                jump = 0;
+
+                player.position.y = 0;
+
+            }
+
+        }
+
+
+        /* SLIDE */
+
+        if (
+            slide > 0
+        ) {
+
+            slide -= delta;
+
+            ball.scale.y = .72;
+
+            ball.scale.x = 1.12;
+
+
+            if (
+                slide <= 0
+            ) {
+
+                ball.scale.y = 1;
+
+                ball.scale.x = 1;
+
+            }
+
+        }
+
+
+        /* ROLLING BALL */
+
+        if (
+            jump <= 0
+        ) {
+
+            ball.rotation.x -=
+                speed *
+                delta *
+                .08;
+
+        }
+
+
+        /* OBJECT MOVEMENT */
+
+        for (
+            let i =
+                objects.length - 1;
+
+            i >= 0;
+
+            i--
+        ) {
+
+            const object =
+                objects[i];
+
+
+            object.mesh.position.z +=
+                speed * delta;
+
+
+            /* COIN ROTATION */
+
+            if (
+                object.type ===
+                "coin"
+            ) {
+
+                object.mesh.rotation.y +=
+                    delta * 7;
+
+            }
+
+
+            /* COLLISION */
+
+            const distanceZ =
+                Math.abs(
+                    object.mesh.position.z -
+                    player.position.z
+                );
+
+
+            const distanceX =
+                Math.abs(
+                    object.mesh.position.x -
+                    player.position.x
+                );
+
+
+            if (
+                distanceZ < 1.15 &&
+                distanceX < 1.15
+            ) {
+
+                /* COIN */
+
+                if (
+                    object.type ===
+                    "coin"
+                ) {
+
+                    coins++;
+
+                    score += 15;
+
+
+                    scene.remove(
+                        object.mesh
+                    );
+
+
+                    objects.splice(
+                        i,
+                        1
+                    );
+
+
+                    continue;
+
+                }
+
+
+                /* LOW OBSTACLE */
+
+                if (
+                    object.type === "low" &&
+                    (
+                        jump > 0 ||
+                        slide > 0
+                    )
+                ) {
+
+                    scene.remove(
+                        object.mesh
+                    );
+
+
+                    objects.splice(
+                        i,
+                        1
+                    );
+
+
+                    continue;
+
+                }
+
+
+                /* NORMAL OBSTACLE */
+
+                if (
+                    object.type === "block" &&
+                    jump > 0
+                ) {
+
+                    scene.remove(
+                        object.mesh
+                    );
+
+
+                    objects.splice(
+                        i,
+                        1
+                    );
+
+
+                    continue;
+
+                }
+
+
+                gameOverScreen();
+
+                break;
+
+            }
+
+
+            /* REMOVE OLD OBJECT */
+
+            if (
+                object.mesh.position.z >
+                10
+            ) {
+
+                scene.remove(
+                    object.mesh
+                );
+
+
+                objects.splice(
+                    i,
+                    1
+                );
+
+            }
+
+        }
+
+
+        /* 1 MINUTE BREAK — based on total session time,
+           not per-run time, so dying doesn't reset it */
+
+        if (
+            sessionElapsed >= nextBreak
+        ) {
+
+            startBreak();
+
+        }
+
+
+        updateHUD();
+
+    }
+
+
+    /* ---------------------------------------------
+       DRAG BREAK
+    --------------------------------------------- */
+
+    if (
+        gameState === "dragging"
+    ) {
+
+        const elapsed =
+            now -
+            dragStartTime;
+
+
+        const progress =
+            Math.min(
+                1,
+                elapsed / 30000
+            );
+
+
+        document.getElementById(
+            "dragProgress"
+        ).style.width =
+            (
+                progress * 100
+            ) + "%";
+
+
+        const secondsLeft =
+            Math.max(
+                0,
+                30 -
+                Math.floor(
+                    elapsed / 1000
+                )
+            );
+
+
+        document.getElementById(
+            "dragTimer"
+        ).textContent =
+            secondsLeft +
+            "s";
+
+
+        if (
+            elapsed >= 30000 &&
+            dragDistance >= 80
+        ) {
+
+            finishBreak();
+
+        }
+
+    }
+
+
+    /* ---------------------------------------------
+       CAMERA
+    --------------------------------------------- */
+
+    camera.position.x +=
+        (
+            player.position.x * .22 -
+            camera.position.x
+        ) *
+        delta *
+        4;
+
+
+    camera.lookAt(
+        player.position.x * .18,
+        1,
+        -12
+    );
+
+
+    renderer.render(
+        scene,
+        camera
+    );
+
+}
+
+
+/* =====================================================
+   START / RESTART BUTTONS
+===================================================== */
+
+document.getElementById(
+    "startButton"
+).onclick =
+    startGame;
+
+
+document.getElementById(
+    "restartButton"
+).onclick =
+    startGame;
+
+
+/* =====================================================
+   INITIAL STATE
+===================================================== */
+
+document.getElementById(
+    "best"
+).textContent =
+    best;
+
+
+requestAnimationFrame(
+    animate
+);
+
+
+/* =====================================================
+   WINDOW RESIZE
+===================================================== */
+
+window.addEventListener(
+    "resize",
+    function() {
+
+        camera.aspect =
+            window.innerWidth /
+            window.innerHeight;
+
+
+        camera.updateProjectionMatrix();
+
+
+        renderer.setSize(
+            window.innerWidth,
+            window.innerHeight
+        );
+
+    }
+);
+
+</script>
+
+</body>
+</html>
