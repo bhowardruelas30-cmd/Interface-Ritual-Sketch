@@ -1,0 +1,3018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Break Runner</title>
+
+<!-- THREE.JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<style>
+
+/* =====================================================
+   CSS — APPEARANCE / LAYOUT
+===================================================== */
+
+* {
+    box-sizing: border-box;
+    user-select: none;
+}
+
+html,
+body {
+    background: #101a2d;
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #07111f;
+    color: white;
+}
+
+#game {
+    position: fixed;
+    inset: 0;
+}
+
+canvas {
+    display: block;
+}
+
+/* ---------------- HUD ---------------- */
+
+#hud {
+    position: fixed;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    z-index: 10;
+
+    display: flex;
+    gap: 30px;
+
+    text-align: center;
+
+    pointer-events: none;
+}
+
+.stat {
+    min-width: 65px;
+}
+
+.statLabel {
+    display: block;
+    font-size: 10px;
+    opacity: 0.55;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.statValue {
+    display: block;
+    font-size: 21px;
+    font-weight: bold;
+}
+
+/* ---------------- CONTROLS ---------------- */
+
+#controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    z-index: 10;
+
+    display: flex;
+    gap: 10px;
+}
+
+.control {
+    width: 55px;
+    height: 55px;
+
+    border: none;
+    border-radius: 50%;
+
+    background: rgba(255,255,255,0.15);
+    color: white;
+
+    font-size: 22px;
+
+    cursor: pointer;
+
+    backdrop-filter: blur(5px);
+}
+
+.control:active {
+    transform: scale(.9);
+}
+
+/* ---------------- OVERLAYS ---------------- */
+
+.overlay {
+    position: fixed;
+    inset: 0;
+
+    z-index: 50;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    background: rgba(0,0,0,.72);
+}
+
+.hidden {
+    display: none !important;
+}
+
+.card {
+    width: min(420px, 90vw);
+
+    padding: 35px;
+
+    border-radius: 22px;
+
+    text-align: center;
+
+    background: #101c2d;
+
+    box-shadow:
+        0 20px 80px rgba(0,0,0,.5);
+}
+
+.breakCard {
+    background: black;
+}
+
+.smallTitle {
+    font-size: 10px;
+    letter-spacing: 3px;
+    opacity: .5;
+    margin-bottom: 12px;
+}
+
+h1 {
+    margin: 0 0 12px;
+    font-size: 34px;
+}
+
+p {
+    font-size: 14px;
+    line-height: 1.5;
+    opacity: .7;
+}
+
+button.mainButton {
+    border: none;
+
+    padding: 14px 30px;
+
+    border-radius: 12px;
+
+    background: white;
+    color: #111;
+
+    font-size: 16px;
+    font-weight: bold;
+
+    cursor: pointer;
+
+    margin-top: 15px;
+}
+
+button.mainButton:active {
+    transform: scale(.96);
+}
+
+/* ---------------- CLICK BREAK ---------------- */
+
+#clickButton {
+    min-width: 170px;
+    font-size: 18px;
+}
+
+#clickCounter {
+    margin-top: 12px;
+    font-size: 13px;
+    opacity: .55;
+}
+
+/* ---------------- DRAG BREAK ---------------- */
+
+.progressOuter {
+    width: 100%;
+    height: 12px;
+
+    margin: 25px 0 12px;
+
+    border-radius: 20px;
+
+    background: #29364b;
+
+    overflow: hidden;
+}
+
+#dragProgress {
+    width: 0%;
+    height: 100%;
+
+    background: white;
+}
+
+#dragTimer {
+    font-size: 26px;
+    font-weight: bold;
+}
+
+#dragMessage {
+    font-size: 13px;
+    opacity: .55;
+}
+
+/* ---------------- GAME OVER ---------------- */
+
+#gameOverStats {
+    font-size: 15px;
+}
+
+
+.breakSettings {
+    margin: 18px 0 8px;
+    padding: 14px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    background: rgba(255,255,255,.045);
+    text-align:left;
+}
+.breakSettingsTitle { font-size: 12px; letter-spacing:.08em; text-transform:uppercase; opacity:.65; margin-bottom:10px; }
+.breakSettingRow { display:flex; justify-content:space-between; align-items:center; gap:14px; margin:9px 0; font-size:13px; }
+.breakSettingRow input { width:78px; box-sizing:border-box; padding:8px 9px; border-radius:9px; border:1px solid rgba(255,255,255,.2); background:#171b2b; color:white; font:inherit; }
+.breakSettingHint { font-size:11px; opacity:.45; margin-top:7px; line-height:1.4; }
+</style>
+</head>
+
+
+<body>
+<button id="edit-time-btn" type="button" class="menu-btn" style="position:fixed;top:20px;right:20px;z-index:5000;">Edit Time</button>
+
+<!-- =====================================================
+     HTML — GAME CONTAINER
+===================================================== -->
+
+<div id="game"></div>
+
+
+<!-- =====================================================
+     HTML — HUD
+===================================================== -->
+
+<div id="hud">
+
+    <div class="stat">
+        <span class="statLabel">Score</span>
+        <span class="statValue" id="score">0</span>
+    </div>
+
+    <div class="stat">
+        <span class="statLabel">Coins</span>
+        <span class="statValue" id="coins">0</span>
+    </div>
+
+    <div class="stat">
+        <span class="statLabel">Best</span>
+        <span class="statValue" id="best">0</span>
+    </div>
+
+    <div class="stat">
+        <span class="statLabel">Time</span>
+        <span class="statValue" id="time">0:00</span>
+    </div>
+    <div class="stat">
+        <span class="statLabel">World</span>
+        <span class="statValue" id="world">City</span>
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     HTML — MOBILE / MOUSE CONTROLS
+===================================================== -->
+
+<div id="legend" style="position:fixed; bottom:88px; left:50%; transform:translateX(-50%); z-index:10; font-size:11px; color:rgba(255,255,255,0.55); display:flex; gap:14px; pointer-events:none;">
+    <span><span style="color:#ff5263;">●</span> switch</span>
+    <span><span style="color:#ffa62e;">●</span> jump/duck</span>
+    <span><span style="color:#8a5cff;">●</span> duck</span>
+    <span><span style="color:#2ee6d6;">●</span> time it</span>
+</div>
+
+<div id="controls">
+
+    <button class="control" id="leftButton">←</button>
+
+    <button class="control" id="jumpButton">↑</button>
+
+    <button class="control" id="slideButton">↓</button>
+
+    <button class="control" id="rightButton">→</button>
+
+</div>
+
+
+<!-- =====================================================
+     START SCREEN
+===================================================== -->
+
+<div id="startScreen" class="overlay">
+
+    <div class="card">
+
+        <div class="smallTitle">
+            BREAK RUNNER
+        </div>
+
+        <h1>Ready?</h1>
+
+        <p style="text-align:left; line-height:1.7;">
+            <span style="color:#ff5263;">●</span> red — switch lanes<br>
+            <span style="color:#ffa62e;">●</span> orange — jump or duck<br>
+            <span style="color:#8a5cff;">●</span> purple — duck only<br>
+            <span style="color:#2ee6d6;">●</span> teal — moving, time your switch<br>
+            <span style="color:#ffd84d;">●</span> collectibles are optional — your score comes from the run
+        </p>
+
+        <div class="breakSettings">
+            <div class="breakSettingsTitle">Break settings</div>
+            <div class="breakSettingRow">
+                <label for="breakIntervalInput">Break every (minutes)</label>
+                <input id="breakIntervalInput" type="number" min="1" max="10" step="1" value="3">
+            </div>
+            <div class="breakSettingRow">
+                <label for="breakDurationInput">Break length (minutes)</label>
+                <input id="breakDurationInput" type="number" min="1" max="30" step="1" value="1">
+            </div>
+            <div class="breakSettingHint">Run time: 1–10 min · Break: 1–30 min</div>
+        </div>
+
+        <p id="startWallet" style="font-size:13px; opacity:.6;"></p>
+
+        <button class="mainButton" id="startButton">
+            START
+        </button>
+
+        <button class="mainButton" id="shopFromStartButton" style="background:transparent; border:1.5px solid white; color:white;">
+            SHOP
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     CLICK BREAK
+===================================================== -->
+
+<div id="clickScreen" class="overlay hidden">
+
+    <div class="card breakCard">
+
+        <div class="smallTitle">
+            QUICK BREAK
+        </div>
+
+        <h1>Pause.</h1>
+
+        <p>
+            Click the button 35 times to continue.
+        </p>
+
+        <button class="mainButton" id="clickButton">
+            CLICK
+        </button>
+
+        <div id="clickCounter">
+            0 / 35
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     DRAG BREAK
+===================================================== -->
+
+<div id="dragScreen" class="overlay hidden">
+
+    <div class="card">
+
+        <div class="smallTitle">
+            30 SECOND BREAK
+        </div>
+
+        <h1>Move around.</h1>
+
+        <div class="progressOuter">
+
+            <div id="dragProgress"></div>
+
+        </div>
+
+        <div id="dragTimer">
+            30s
+        </div>
+
+        <div id="dragMessage">
+            Click START when you're ready.
+        </div>
+
+        <button class="mainButton" id="startDrag">
+            START
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     GAME OVER
+===================================================== -->
+
+<div id="gameOver" class="overlay hidden">
+
+    <div class="card">
+
+        <div class="smallTitle">
+            RUN OVER
+        </div>
+
+        <h1>Nice run.</h1>
+
+        <p id="gameOverStats"></p>
+
+        <p id="gameOverWallet" style="font-size:13px; opacity:.6; margin-top:-6px;"></p>
+
+        <button class="mainButton" id="restartButton">
+            RUN AGAIN
+        </button>
+
+        <button class="mainButton" id="shopFromGameOverButton" style="background:transparent; border:1.5px solid white; color:white;">
+            SHOP
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     SHOP
+===================================================== -->
+
+<div id="shopScreen" class="overlay hidden">
+
+    <div class="card" style="width:min(480px, 92vw);">
+
+        <div class="smallTitle">
+            BALL SHOP
+        </div>
+
+        <h1>Spend your coins.</h1>
+
+        <p id="shopWallet" style="margin-bottom:18px;"></p>
+
+        <div id="shopList" style="display:flex; flex-direction:column; gap:10px; text-align:left; max-height:46vh; overflow-y:auto; padding-right:6px;"></div>
+
+        <button class="mainButton" id="shopBackButton" style="margin-top:20px;">
+            BACK
+        </button>
+
+    </div>
+
+</div>
+
+
+<script>
+
+/* =====================================================
+   JAVASCRIPT — 3D WORLD
+===================================================== */
+
+const gameContainer = document.getElementById("game");
+
+
+/* ---------------- THREE.JS SETUP ---------------- */
+
+const scene = new THREE.Scene();
+
+scene.background = new THREE.Color(0xf29a63);
+
+scene.fog = new THREE.Fog(
+    0xf6b07a,
+    25,
+    100
+);
+
+
+const camera = new THREE.PerspectiveCamera(
+    62,
+    window.innerWidth / window.innerHeight,
+    .1,
+    250
+);
+
+camera.position.set(
+    0,
+    4.2,
+    8.5
+);
+
+
+const renderer = new THREE.WebGLRenderer({
+    antialias: true
+});
+
+renderer.setPixelRatio(
+    Math.min(window.devicePixelRatio, 2)
+);
+
+renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+);
+
+renderer.shadowMap.enabled = true;
+
+gameContainer.appendChild(
+    renderer.domElement
+);
+
+
+/* =====================================================
+   LIGHTING
+===================================================== */
+
+const skyLight =
+    new THREE.HemisphereLight(
+        0xbddcff,
+        0x182238,
+        1.3
+    );
+
+scene.add(skyLight);
+
+
+const sun =
+    new THREE.DirectionalLight(
+        0xffffff,
+        1.2
+    );
+
+sun.position.set(
+    5,
+    12,
+    8
+);
+
+sun.castShadow = true;
+
+scene.add(sun);
+
+// Visible sunset sun: a warm horizon object instead of a black sky.
+const sunsetSun = new THREE.Mesh(
+    new THREE.SphereGeometry(5.5, 32, 32),
+    new THREE.MeshBasicMaterial({ color: 0xffc45c })
+);
+sunsetSun.position.set(-18, 18, -95);
+scene.add(sunsetSun);
+
+
+/* =====================================================
+   ROAD
+===================================================== */
+
+const roadMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x17263b,
+        roughness: 1
+    });
+
+
+const road =
+    new THREE.Mesh(
+        new THREE.PlaneGeometry(
+            10,
+            500
+        ),
+        roadMaterial
+    );
+
+road.rotation.x =
+    -Math.PI / 2;
+
+road.position.z = -220;
+
+road.receiveShadow = true;
+
+scene.add(road);
+
+
+/* ---------------- SIDE AREAS ---------------- */
+
+const sideMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x223a54
+    });
+
+
+for (const x of [-6.2, 6.2]) {
+
+    const side =
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                2,
+                .15,
+                500
+            ),
+            sideMaterial
+        );
+
+    side.position.set(
+        x,
+        -.02,
+        -220
+    );
+
+    scene.add(side);
+
+}
+
+
+/* =====================================================
+   BACKGROUND THEMES — cycle every 500 score, smooth crossfade
+===================================================== */
+
+const bgThemes = [
+    { name: "City Sunset", bg: 0xf29a63, fog: 0xf8c18b, road: 0x343944, side: 0x5b6675 },
+    { name: "Jungle", bg: 0x39b87a, fog: 0x79d6a6, road: 0x3d4540, side: 0x287a4e },
+    { name: "Desert", bg: 0xffb45c, fog: 0xffd28a, road: 0x65534b, side: 0xc58a45 },
+    { name: "Night City", bg: 0x26346f, fog: 0x4657a0, road: 0x25283a, side: 0x30385d },
+    { name: "Snow", bg: 0x91d9ff, fog: 0xd5f1ff, road: 0x667482, side: 0xbad9e8 },
+    { name: "Coast", bg: 0x38c9dc, fog: 0x8be9f2, road: 0x3f5256, side: 0x2e9a9c }
+];
+
+let themeTier = 0;
+
+const themeFrom = {
+    bg: new THREE.Color(0xf29a63),
+    fog: new THREE.Color(0xf8c18b),
+    road: new THREE.Color(bgThemes[0].road),
+    side: new THREE.Color(bgThemes[0].side)
+};
+
+const themeTo = {
+    bg: new THREE.Color(0xf29a63),
+    fog: new THREE.Color(0xf8c18b),
+    road: new THREE.Color(bgThemes[0].road),
+    side: new THREE.Color(bgThemes[0].side)
+};
+
+let themeTransitioning = false;
+let themeTransitionStart = 0;
+const THEME_TRANSITION_MS = 2400;
+
+function startThemeTransition(newTier) {
+
+    const clampedTier =
+        ((newTier % bgThemes.length) + bgThemes.length) % bgThemes.length;
+
+    themeFrom.bg.copy(scene.background);
+    themeFrom.fog.copy(scene.fog.color);
+    themeFrom.road.copy(roadMaterial.color);
+    themeFrom.side.copy(sideMaterial.color);
+
+    const target = bgThemes[clampedTier];
+    themeTo.bg.set(target.bg);
+    themeTo.fog.set(target.fog);
+    themeTo.road.set(target.road);
+    themeTo.side.set(target.side);
+
+    themeTransitionStart = performance.now();
+    themeTransitioning = true;
+    themeTier = clampedTier;
+
+}
+
+function updateThemeTransition(now) {
+
+    if (!themeTransitioning) return;
+
+    const t =
+        Math.min(
+            1,
+            (now - themeTransitionStart) / THEME_TRANSITION_MS
+        );
+
+    scene.background.lerpColors(themeFrom.bg, themeTo.bg, t);
+    scene.fog.color.lerpColors(themeFrom.fog, themeTo.fog, t);
+    roadMaterial.color.lerpColors(themeFrom.road, themeTo.road, t);
+    sideMaterial.color.lerpColors(themeFrom.side, themeTo.side, t);
+
+    if (t >= 1) {
+        themeTransitioning = false;
+        rebuildEnvironment(themeTier);
+    }
+
+}
+
+/* =====================================================
+   ENVIRONMENTS — actual 3D scenery, not just background colors
+===================================================== */
+const environmentObjects = [];
+
+function addEnv(mesh) {
+    scene.add(mesh);
+    environmentObjects.push(mesh);
+    return mesh;
+}
+
+function clearEnvironment() {
+    while (environmentObjects.length) scene.remove(environmentObjects.pop());
+}
+
+function makeBuilding(x, z, h, w, d, color, lit=false) {
+    const palette = [0x4f7cff, 0xff6b6b, 0xffb84d, 0x6bd6c5, 0x9b7cff, 0x4fc3f7];
+    const chosen = color === 0x7c8794 ? palette[Math.floor(Math.random()*palette.length)] : color;
+    const m = new THREE.Mesh(
+        new THREE.BoxGeometry(w,h,d),
+        new THREE.MeshStandardMaterial({color:chosen, roughness:.72, metalness:.05})
+    );
+    m.position.set(x,h/2-.02,z); addEnv(m);
+
+    // Bright roof strip / sign makes the city feel like a game world, not a gray block field.
+    const signColors = [0xffe45c, 0xff5fa2, 0x55e6ff, 0x8cff66];
+    const sign = new THREE.Mesh(
+        new THREE.BoxGeometry(Math.min(.8,w*.7), .16, .05),
+        new THREE.MeshBasicMaterial({color:signColors[Math.floor(Math.random()*signColors.length)]})
+    );
+    sign.position.set(x, Math.min(h-.35, 2.0 + Math.random()*Math.max(0,h-2)), z-d/2-.04);
+    addEnv(sign);
+
+    if (lit) {
+        for (let r=0;r<Math.max(2,Math.floor(h/2));r++) {
+            const win=new THREE.Mesh(
+                new THREE.BoxGeometry(Math.min(.32,w*.35),.16,.04),
+                new THREE.MeshBasicMaterial({color:[0xffd75e,0x66e6ff,0xff7ad9][r%3]})
+            );
+            win.position.set(x+(Math.random()-.5)*w*.55,.9+r*1.15,z-d/2-.03); addEnv(win);
+        }
+    }
+}
+
+function makeTree(x,z,scale=1) {
+    const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.16*scale,.24*scale,1.6*scale,8),new THREE.MeshStandardMaterial({color:0x6b4328}));
+    trunk.position.set(x,.8*scale,z); addEnv(trunk);
+    const crown=new THREE.Mesh(new THREE.SphereGeometry(1*scale,10,8),new THREE.MeshStandardMaterial({color:0x2f8f3d,roughness:1}));
+    crown.position.set(x,1.9*scale,z); addEnv(crown);
+}
+
+function makeCactus(x,z,scale=1) {
+    const mat=new THREE.MeshStandardMaterial({color:0x3e8f45});
+    const stem=new THREE.Mesh(new THREE.CylinderGeometry(.16*scale,.2*scale,1.8*scale,8),mat);
+    stem.position.set(x,.9*scale,z); addEnv(stem);
+    const arm=new THREE.Mesh(new THREE.CylinderGeometry(.11*scale,.13*scale,.75*scale,8),mat);
+    arm.position.set(x+.35*scale,1.05*scale,z); arm.rotation.z=Math.PI/2; addEnv(arm);
+}
+
+function makeLamp(x,z) {
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(.05,.07,2.6,8),new THREE.MeshStandardMaterial({color:0x30343a}));
+    pole.position.set(x,1.3,z); addEnv(pole);
+    const lamp=new THREE.Mesh(new THREE.SphereGeometry(.16,10,8),new THREE.MeshBasicMaterial({color:0xffe36e}));
+    lamp.position.set(x,2.62,z); addEnv(lamp);
+}
+
+function rebuildEnvironment(tier) {
+    clearEnvironment();
+    const type=bgThemes[tier].name;
+    for (let i=0;i<22;i++) {
+        const z=-18-i*10;
+        const side=i%2===0?-1:1;
+        const x=side*(7+Math.random()*3);
+        if (type === "City Sunset" || type === "Night City") {
+            const cityPalette = type === "Night City"
+                ? [0x29345f,0x394b82,0x4b3b72,0x263b52]
+                : [0x4f7cff,0xff6b6b,0xffa94d,0x6bd6c5,0x9b7cff,0x4fc3f7,0xf06aa8];
+            // Dense rows of buildings create an actual city skyline on both sides.
+            const nearX = side * (5.2 + Math.random()*2.0);
+            const farX = -side * (8.0 + Math.random()*3.0);
+            makeBuilding(nearX,z,3.5+Math.random()*6,2.0+Math.random()*1.8,2.8,cityPalette[i%cityPalette.length],type==="Night City");
+            makeBuilding(farX,z-3,4.5+Math.random()*7,2.2+Math.random()*2.0,3.0,cityPalette[(i+2)%cityPalette.length],type==="Night City");
+            if(i%2===0) makeBuilding(side*10.5,z-6,5+Math.random()*8,2.5,3.2,cityPalette[(i+4)%cityPalette.length],type==="Night City");
+            if(i%2===0) makeLamp(side*4.7,z+3);
+            if(type === "City Sunset" && i%3===0) makeTree(side*4.4,z+4,.6+Math.random()*.25);
+        } else if (type === "Jungle") {
+            makeTree(x,z,.8+Math.random()*.7);
+            if(i%4===0) makeTree(-side*(7.5+Math.random()*2),z-4,.6+Math.random()*.5);
+        } else if (type === "Desert") {
+            makeCactus(x,z,.7+Math.random()*.7);
+            if(i%3===0) { const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(.6+Math.random()*.5),new THREE.MeshStandardMaterial({color:0x8c674d})); rock.position.set(-side*(7+Math.random()*2),.45,z-3); addEnv(rock); }
+        } else if (type === "Snow") {
+            const tree=new THREE.Mesh(new THREE.ConeGeometry(.75,2.5,8),new THREE.MeshStandardMaterial({color:0x315f4a})); tree.position.set(x,1.25,z); addEnv(tree);
+            const snow=new THREE.Mesh(new THREE.ConeGeometry(.8,1,8),new THREE.MeshStandardMaterial({color:0xf4f8fb})); snow.position.set(x,2,z); addEnv(snow);
+        } else {
+            const rock=new THREE.Mesh(new THREE.SphereGeometry(.8,10,8),new THREE.MeshStandardMaterial({color:0x6a7b7d})); rock.position.set(x,.45,z); addEnv(rock);
+            const post=new THREE.Mesh(new THREE.BoxGeometry(.12,1.6,.12),new THREE.MeshStandardMaterial({color:0x8b5a3c})); post.position.set(side*5.9,.8,z); addEnv(post);
+        }
+    }
+}
+
+rebuildEnvironment(0);
+
+/* ---------------- LANE LINES ---------------- */
+
+const laneMaterial =
+    new THREE.MeshBasicMaterial({
+        color: 0xb8c9dc,
+        transparent: true,
+        opacity: .25
+    });
+
+
+for (const x of [-1.55, 1.55]) {
+
+    const line =
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                .04,
+                .025,
+                500
+            ),
+            laneMaterial
+        );
+
+    line.position.set(
+        x,
+        .02,
+        -220
+    );
+
+    scene.add(line);
+
+}
+
+
+/* =====================================================
+   PLAYER — VISIBLE 3D BALL
+===================================================== */
+
+const player =
+    new THREE.Group();
+
+
+const ballMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: .3,
+        metalness: .05
+    });
+
+
+const ball =
+    new THREE.Mesh(
+        new THREE.SphereGeometry(
+            .65,
+            32,
+            24
+        ),
+        ballMaterial
+    );
+
+ball.position.y = .72;
+
+ball.castShadow = true;
+
+player.add(ball);
+
+
+/* ---------------- SKINS ---------------- */
+
+function createSoccerTexture() {
+
+    const width = 1024;
+    const height = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#f5f5f0";
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = "#141414";
+
+    function drawPentagon(cx, cy, r, rotation) {
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+            const angle = rotation + i * (Math.PI * 2 / 5) - Math.PI / 2;
+            const x = cx + r * Math.cos(angle);
+            const y = cy + r * Math.sin(angle);
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    // evenly spaced, staggered rows so the pattern tiles seamlessly
+    // around the sphere without visible gaps or a "seam" at the wrap edge
+    const rows = 5;
+    const pentR = 46;
+
+    for (let row = 0; row < rows; row++) {
+
+        const y = (row + 0.5) * (height / rows);
+        const cols = row % 2 === 0 ? 6 : 7;
+        const offsetX = row % 2 === 0 ? (width / cols) / 2 : 0;
+
+        for (let col = 0; col < cols; col++) {
+            const x = offsetX + (col + 0.5) * (width / cols);
+            drawPentagon(x, y, pentR, (row + col) * 0.55);
+        }
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    return texture;
+}
+
+const soccerTexture = createSoccerTexture();
+
+
+/* ---------------- TENNIS BALL ---------------- */
+
+function createTennisTexture() {
+    const w = 1024, h = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#d7ec2a";
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = "#fbfff0";
+    ctx.lineWidth = 24;
+    ctx.lineCap = "round";
+
+    function seamCurve(sign) {
+        ctx.beginPath();
+        for (let x = 0; x <= w; x += 4) {
+            const y = h * 0.5 + sign * Math.sin((x / w) * Math.PI * 2) * h * 0.24;
+            if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    }
+    seamCurve(1);
+    seamCurve(-1);
+
+    const t = new THREE.CanvasTexture(canvas);
+    t.wrapS = THREE.RepeatWrapping;
+    return t;
+}
+const tennisTexture = createTennisTexture();
+
+
+/* ---------------- BASKETBALL ---------------- */
+
+function createBasketballTexture() {
+    const w = 1024, h = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#d9782d";
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = "#221208";
+    ctx.lineWidth = 9;
+
+    ctx.beginPath();
+    ctx.moveTo(0, h / 2);
+    ctx.lineTo(w, h / 2);
+    ctx.stroke();
+
+    const seams = 6;
+    for (let i = 0; i < seams; i++) {
+        const xBase = (i / seams) * w;
+        ctx.beginPath();
+        for (let y = 0; y <= h; y += 4) {
+            const t2 = (y / h) - 0.5;
+            const x = xBase + Math.sin(t2 * Math.PI) * (w / seams) * 0.55;
+            if (y === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    }
+
+    const t = new THREE.CanvasTexture(canvas);
+    t.wrapS = THREE.RepeatWrapping;
+    return t;
+}
+const basketballTexture = createBasketballTexture();
+
+
+/* ---------------- BASEBALL ---------------- */
+
+function createBaseballTexture() {
+    const w = 1024, h = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#f7f2e4";
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = "#c23b3b";
+
+    function stitchCurve(sign) {
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        const pts = [];
+        for (let x = 0; x <= w; x += 4) {
+            const y = h * 0.5 + sign * Math.sin((x / w) * Math.PI * 2 + Math.PI / 2) * h * 0.2;
+            pts.push([x, y]);
+            if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        ctx.lineWidth = 3;
+        for (let i = 0; i < pts.length; i += 6) {
+            const [x, y] = pts[i];
+            ctx.beginPath();
+            ctx.moveTo(x - 7, y - 7);
+            ctx.lineTo(x + 7, y + 7);
+            ctx.stroke();
+        }
+    }
+    stitchCurve(1);
+    stitchCurve(-1);
+
+    const t = new THREE.CanvasTexture(canvas);
+    t.wrapS = THREE.RepeatWrapping;
+    return t;
+}
+const baseballTexture = createBaseballTexture();
+
+
+/* ---------------- GOLF BALL ---------------- */
+
+function createGolfTexture() {
+    const w = 1024, h = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#fbfbf6";
+    ctx.fillRect(0, 0, w, h);
+
+    const rows = 10, cols = 20;
+    for (let r = 0; r < rows; r++) {
+        const y = (r + 0.5) * (h / rows);
+        const offset = (r % 2 === 0) ? 0 : (w / cols) / 2;
+        for (let c = 0; c < cols; c++) {
+            const x = offset + (c + 0.5) * (w / cols);
+            const grad = ctx.createRadialGradient(x, y, 1, x, y, 9);
+            grad.addColorStop(0, "#d6d6ce");
+            grad.addColorStop(1, "#fbfbf6");
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(x, y, 9, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    const t = new THREE.CanvasTexture(canvas);
+    t.wrapS = THREE.RepeatWrapping;
+    return t;
+}
+const golfTexture = createGolfTexture();
+
+
+/* ---------------- 8 BALL ---------------- */
+
+function createEightballTexture() {
+    const w = 1024, h = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#0c0c0c";
+    ctx.fillRect(0, 0, w, h);
+
+    function drawBadge(cx, cy) {
+        ctx.fillStyle = "#f5f5f0";
+        ctx.beginPath();
+        ctx.arc(cx, cy, 72, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#0c0c0c";
+        ctx.font = "bold 86px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("8", cx, cy + 6);
+    }
+    drawBadge(w * 0.27, h * 0.5);
+    drawBadge(w * 0.77, h * 0.5);
+
+    const t = new THREE.CanvasTexture(canvas);
+    t.wrapS = THREE.RepeatWrapping;
+    return t;
+}
+const eightballTexture = createEightballTexture();
+
+
+/* ---------------- VOLLEYBALL ---------------- */
+
+function createVolleyballTexture() {
+    const w = 1024, h = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+
+    const img = ctx.createImageData(w, h);
+    const palette = [[244, 244, 239], [28, 95, 174], [244, 199, 40]];
+    const bandWidth = w / 6;
+
+    for (let y = 0; y < h; y++) {
+        const wiggle = Math.sin((y / h) * Math.PI) * bandWidth * 0.4;
+        for (let x = 0; x < w; x++) {
+            const eff = x + wiggle;
+            const band = ((Math.floor(eff / bandWidth) % 3) + 3) % 3;
+            const idx = (y * w + x) * 4;
+            const c = palette[band];
+            img.data[idx] = c[0];
+            img.data[idx + 1] = c[1];
+            img.data[idx + 2] = c[2];
+            img.data[idx + 3] = 255;
+        }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    ctx.strokeStyle = "rgba(20,20,20,0.45)";
+    ctx.lineWidth = 4;
+    for (let i = 0; i < 6; i++) {
+        const xBase = i * bandWidth;
+        ctx.beginPath();
+        for (let y = 0; y <= h; y += 4) {
+            const wiggle = Math.sin((y / h) * Math.PI) * bandWidth * 0.4;
+            const x = xBase - wiggle;
+            if (y === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    }
+
+    const t = new THREE.CanvasTexture(canvas);
+    t.wrapS = THREE.RepeatWrapping;
+    return t;
+}
+const volleyballTexture = createVolleyballTexture();
+
+
+const textureBySkin = {
+    soccer: soccerTexture,
+    tennis: tennisTexture,
+    basketball: basketballTexture,
+    baseball: baseballTexture,
+    golf: golfTexture,
+    eightball: eightballTexture,
+    volleyball: volleyballTexture
+};
+
+function applySkin(id) {
+    const skin = skins.find(s => s.id === id);
+    if (!skin) return;
+
+    if (skin.texture) {
+        ballMaterial.map = textureBySkin[skin.id];
+        ballMaterial.color.set(0xffffff);
+    } else {
+        ballMaterial.map = null;
+        ballMaterial.color.set(skin.color);
+    }
+    ballMaterial.needsUpdate = true;
+
+    equippedSkin = id;
+    localStorage.breakRunnerEquipped = id;
+}
+
+/* initial skin is applied later, once equippedSkin is defined */
+
+
+/* ---------------- BALL PANEL ---------------- */
+
+const panelMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x182334,
+        roughness: .45
+    });
+
+
+const panel =
+    new THREE.Mesh(
+        new THREE.TorusGeometry(
+            .35,
+            .06,
+            12,
+            28
+        ),
+        panelMaterial
+    );
+
+panel.rotation.x =
+    Math.PI / 2;
+
+panel.position.y = .72;
+
+player.add(panel);
+
+
+/* ---------------- BALL SHADOW ---------------- */
+
+const shadow =
+    new THREE.Mesh(
+        new THREE.CircleGeometry(
+            .7,
+            32
+        ),
+        new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: .3
+        })
+    );
+
+shadow.rotation.x =
+    -Math.PI / 2;
+
+shadow.position.y = .025;
+
+player.add(shadow);
+
+
+player.position.set(
+    0,
+    0,
+    1
+);
+
+scene.add(player);
+
+
+/* =====================================================
+   GAME VARIABLES
+===================================================== */
+
+const lanes = [
+    -3.1,
+    0,
+    3.1
+];
+
+let currentLane = 1;
+
+let targetX = 0;
+
+let speed = 22;
+
+let score = 0;
+
+let coins = 0;
+
+let best =
+    Number(localStorage.breakRunnerBest || 0);
+
+let wallet =
+    Number(localStorage.breakRunnerWallet || 0);
+
+let ownedSkins =
+    JSON.parse(
+        localStorage.breakRunnerOwned || '["white"]'
+    );
+
+let equippedSkin =
+    localStorage.breakRunnerEquipped || "white";
+
+const rarityColors = {
+    "Common":     "#9aa0a6",
+    "Uncommon":   "#4caf50",
+    "Rare":       "#3ea6ff",
+    "Super Rare": "#a970ff",
+    "Epic":       "#ff5ec4",
+    "Mythic":     "#ff9f43",
+    "Legendary":  "#ffd54a",
+    "Ultra":      "#ff4d4d"
+};
+
+const skins = [
+    { id: "white",      name: "Classic White", cost: 0,   color: 0xffffff, rarity: "Common" },
+    { id: "red",        name: "Red",           cost: 90,  color: 0xff5c5c, rarity: "Uncommon" },
+    { id: "blue",       name: "Blue",          cost: 90,  color: 0x4c9aff, rarity: "Uncommon" },
+    { id: "golf",       name: "Golf Ball",     cost: 170, texture: true,  rarity: "Rare" },
+    { id: "tennis",     name: "Tennis Ball",   cost: 170, texture: true,  rarity: "Rare" },
+    { id: "baseball",   name: "Baseball",      cost: 260, texture: true,  rarity: "Super Rare" },
+    { id: "basketball", name: "Basketball",    cost: 260, texture: true,  rarity: "Super Rare" },
+    { id: "gold",       name: "Gold",          cost: 380, color: 0xffd75e, rarity: "Epic" },
+    { id: "volleyball", name: "Volleyball",    cost: 380, texture: true,  rarity: "Epic" },
+    { id: "black",      name: "Matte Black",   cost: 520, color: 0x1a1a1a, rarity: "Mythic" },
+    { id: "eightball",  name: "8 Ball",        cost: 700, texture: true,  rarity: "Legendary" },
+    { id: "soccer",     name: "Soccer Ball",   cost: 950, texture: true,  rarity: "Ultra" }
+];
+
+let jump = 0;
+
+let slide = 0;
+
+let spawnTimer = 0;
+
+let gameState = "menu";
+
+let runStart = 0;
+
+let sessionStart = null;
+
+let lastTime = performance.now();
+
+let nextBreak = 180000;
+
+let breakIntervalMinutes = Math.min(10, Math.max(1, Number(localStorage.breakRunnerIntervalMinutes || 3)));
+let breakDurationMinutes = Math.min(30, Math.max(1, Number(localStorage.breakRunnerDurationMinutes || 1)));
+
+function saveBreakSettings() {
+    const intervalInput = document.getElementById("breakIntervalInput");
+    const durationInput = document.getElementById("breakDurationInput");
+    breakIntervalMinutes = Math.min(10, Math.max(1, Number(intervalInput.value) || 3));
+    breakDurationMinutes = Math.min(30, Math.max(1, Number(durationInput.value) || 1));
+    intervalInput.value = breakIntervalMinutes;
+    durationInput.value = breakDurationMinutes;
+    localStorage.breakRunnerIntervalMinutes = breakIntervalMinutes;
+    localStorage.breakRunnerDurationMinutes = breakDurationMinutes;
+}
+
+function loadBreakSettings() {
+    const intervalInput = document.getElementById("breakIntervalInput");
+    const durationInput = document.getElementById("breakDurationInput");
+    if (!intervalInput || !durationInput) return;
+    intervalInput.value = breakIntervalMinutes;
+    durationInput.value = breakDurationMinutes;
+    intervalInput.addEventListener("change", saveBreakSettings);
+    durationInput.addEventListener("change", saveBreakSettings);
+}
+
+
+/* =====================================================
+   OBJECTS
+===================================================== */
+
+const objects = [];
+
+
+/* ---------------- COIN ---------------- */
+
+const coinGeometry =
+    new THREE.TorusGeometry(
+        .27,
+        .09,
+        12,
+        24
+    );
+
+
+const coinMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0xffd84d,
+        emissive: 0x654900,
+        metalness: .4
+    });
+
+
+function createCoin(
+    laneIndex,
+    z,
+    y = .8
+) {
+
+    const coin =
+        new THREE.Mesh(
+            coinGeometry,
+            coinMaterial
+        );
+
+    coin.position.set(
+        lanes[laneIndex],
+        y,
+        z
+    );
+
+    scene.add(coin);
+
+    objects.push({
+        mesh: coin,
+        type: "coin",
+        lane: laneIndex
+    });
+
+}
+
+
+/* =====================================================
+   OBSTACLES
+===================================================== */
+
+const blockGeometry =
+    new THREE.BoxGeometry(
+        1.25,
+        1.4,
+        1.15
+    );
+
+
+const blockMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0xff5263
+    });
+
+
+const lowGeometry =
+    new THREE.BoxGeometry(
+        1.4,
+        .55,
+        1.1
+    );
+
+
+const lowMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0xffa62e
+    });
+
+
+const beamGeometry =
+    new THREE.BoxGeometry(
+        1.4,
+        .4,
+        .3
+    );
+
+
+const beamMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x8a5cff,
+        emissive: 0x2a1050,
+        roughness: .5
+    });
+
+
+const moverGeometry =
+    new THREE.OctahedronGeometry(.72);
+
+
+const moverMaterial =
+    new THREE.MeshStandardMaterial({
+        color: 0x2ee6d6,
+        emissive: 0x0d4a44,
+        roughness: .35,
+        metalness: .2
+    });
+
+
+function createObstacle(
+    laneIndex,
+    z,
+    type
+) {
+
+    let mesh;
+
+    if (type === "low") {
+
+        mesh =
+            new THREE.Mesh(
+                lowGeometry,
+                lowMaterial
+            );
+
+        mesh.position.y = .3;
+
+    } else if (type === "beam") {
+
+        mesh =
+            new THREE.Mesh(
+                beamGeometry,
+                beamMaterial
+            );
+
+        mesh.position.y = 1.15;
+
+    } else if (type === "mover") {
+
+        mesh =
+            new THREE.Mesh(
+                moverGeometry,
+                moverMaterial
+            );
+
+        mesh.position.y = .6;
+
+    } else {
+
+        mesh =
+            new THREE.Mesh(
+                blockGeometry,
+                blockMaterial
+            );
+
+        mesh.position.y = .7;
+
+    }
+
+    mesh.position.x =
+        lanes[laneIndex];
+
+    mesh.position.z = z;
+
+    mesh.castShadow = true;
+
+    scene.add(mesh);
+
+    objects.push({
+        mesh: mesh,
+        type: type,
+        lane: laneIndex,
+        moverPhase: Math.random() * Math.PI * 2
+    });
+
+}
+
+
+/* =====================================================
+   OBSTACLE / COIN PATTERNS
+===================================================== */
+
+function spawnPattern() {
+
+    const random =
+        Math.random();
+
+
+    /* COIN TRAIL */
+
+    if (random < .30) {
+
+        const laneIndex =
+            Math.floor(
+                Math.random() * 3
+            );
+
+        for (
+            let i = 0;
+            i < 6;
+            i++
+        ) {
+
+            createCoin(
+                laneIndex,
+                -75 - i * 4
+            );
+
+        }
+
+        return;
+    }
+
+
+    /* TWO BLOCKS + SAFE LANE */
+
+    if (random < .50) {
+
+        const safeLane =
+            Math.floor(
+                Math.random() * 3
+            );
+
+        for (
+            let i = 0;
+            i < 3;
+            i++
+        ) {
+
+            if (i !== safeLane) {
+
+                createObstacle(
+                    i,
+                    -75,
+                    "block"
+                );
+
+            }
+
+        }
+
+        createCoin(
+            safeLane,
+            -80,
+            1
+        );
+
+        return;
+    }
+
+
+    /* LOW OBSTACLE */
+
+    if (random < .68) {
+
+        const laneIndex =
+            Math.floor(
+                Math.random() * 3
+            );
+
+        createObstacle(
+            laneIndex,
+            -75,
+            "low"
+        );
+
+        createCoin(
+            laneIndex,
+            -81,
+            1.5
+        );
+
+        return;
+    }
+
+
+    /* BEAM OBSTACLE — duck only */
+
+    if (random < .76) {
+
+        const laneIndex =
+            Math.floor(
+                Math.random() * 3
+            );
+
+        createObstacle(
+            laneIndex,
+            -75,
+            "beam"
+        );
+
+        createCoin(
+            laneIndex,
+            -81,
+            .5
+        );
+
+        return;
+    }
+
+
+    /* MOVER — sweeps across lanes as it approaches, timing not memory */
+
+    if (random < .90) {
+
+        createObstacle(
+            1,
+            -78,
+            "mover"
+        );
+
+        return;
+    }
+
+
+    /* MIXED PATTERN */
+
+    const laneIndex =
+        Math.floor(
+            Math.random() * 3
+        );
+
+
+    createObstacle(
+        laneIndex,
+        -75,
+        "block"
+    );
+
+
+    createCoin(
+        (laneIndex + 1) % 3,
+        -80
+    );
+
+
+    createCoin(
+        (laneIndex + 2) % 3,
+        -85
+    );
+
+}
+
+
+/* =====================================================
+   PLAYER MOVEMENT
+===================================================== */
+
+function moveLeft() {
+
+    if (gameState !== "playing")
+        return;
+
+    currentLane =
+        Math.max(
+            0,
+            currentLane - 1
+        );
+
+    targetX =
+        lanes[currentLane];
+}
+
+
+function moveRight() {
+
+    if (gameState !== "playing")
+        return;
+
+    currentLane =
+        Math.min(
+            2,
+            currentLane + 1
+        );
+
+    targetX =
+        lanes[currentLane];
+}
+
+
+function jumpNow() {
+
+    if (
+        gameState !== "playing" ||
+        jump > 0 ||
+        slide > 0
+    )
+        return;
+
+    jump = .01;
+}
+
+
+function slideNow() {
+
+    if (
+        gameState !== "playing" ||
+        jump > 0
+    )
+        return;
+
+    slide = .45;
+}
+
+
+/* =====================================================
+   KEYBOARD CONTROLS
+===================================================== */
+
+window.addEventListener(
+    "keydown",
+    function(event) {
+
+        if (
+            event.key === "ArrowLeft" ||
+            event.key.toLowerCase() === "a"
+        ) {
+            moveLeft();
+        }
+
+
+        if (
+            event.key === "ArrowRight" ||
+            event.key.toLowerCase() === "d"
+        ) {
+            moveRight();
+        }
+
+
+        if (
+            event.key === "ArrowUp" ||
+            event.key.toLowerCase() === "w" ||
+            event.code === "Space"
+        ) {
+            jumpNow();
+        }
+
+
+        if (
+            event.key === "ArrowDown" ||
+            event.key.toLowerCase() === "s"
+        ) {
+            slideNow();
+        }
+
+    }
+);
+
+
+/* =====================================================
+   BUTTON CONTROLS
+===================================================== */
+
+document.getElementById(
+    "leftButton"
+).onclick = moveLeft;
+
+
+document.getElementById(
+    "rightButton"
+).onclick = moveRight;
+
+
+document.getElementById(
+    "jumpButton"
+).onclick = jumpNow;
+
+
+document.getElementById(
+    "slideButton"
+).onclick = slideNow;
+
+
+/* =====================================================
+   GAME START
+===================================================== */
+
+function startGame() {
+
+    objects.forEach(
+        object =>
+            scene.remove(
+                object.mesh
+            )
+    );
+
+    objects.length = 0;
+
+
+    score = 0;
+
+    coins = 0;
+
+    speed = 22;
+
+    spawnTimer = 0;
+
+    currentLane = 1;
+
+    targetX = 0;
+
+    player.position.set(
+        0,
+        0,
+        1
+    );
+
+    jump = 0;
+
+    slide = 0;
+
+    runStart =
+        performance.now();
+
+    lastTime =
+        performance.now();
+
+    if (
+        sessionStart === null
+    ) {
+
+        sessionStart =
+            performance.now();
+
+        nextBreak = breakIntervalMinutes * 60000;
+
+    }
+
+    gameState = "playing";
+
+
+    document.getElementById(
+        "startScreen"
+    ).classList.add("hidden");
+
+
+    document.getElementById(
+        "gameOver"
+    ).classList.add("hidden");
+
+
+    updateHUD();
+
+}
+
+
+/* =====================================================
+   GAME OVER
+===================================================== */
+
+function gameOverScreen() {
+
+    gameState = "gameover";
+
+
+    best =
+        Math.max(
+            best,
+            score
+        );
+
+
+    localStorage.breakRunnerBest =
+        best;
+
+
+    document.getElementById(
+        "best"
+    ).textContent = best;
+
+
+    document.getElementById(
+        "gameOverStats"
+    ).textContent =
+        "Score: " +
+        score +
+        "   •   Coins: " +
+        coins;
+
+
+    wallet += coins;
+
+    localStorage.breakRunnerWallet =
+        wallet;
+
+
+    document.getElementById(
+        "gameOverWallet"
+    ).textContent =
+        "wallet: " + wallet + " coins";
+
+
+    document.getElementById(
+        "gameOver"
+    ).classList.remove(
+        "hidden"
+    );
+
+}
+
+
+/* =====================================================
+   BREAK SYSTEM
+===================================================== */
+
+let clickAmount = 0;
+
+
+function updateBreakDurationUI() {
+    const title = document.querySelector("#dragScreen .smallTitle");
+    const timer = document.getElementById("dragTimer");
+    if (title) title.textContent = breakDurationMinutes + (breakDurationMinutes === 1 ? " MINUTE BREAK" : " MINUTE BREAK");
+    if (timer) timer.textContent = (breakDurationMinutes * 60) + "s";
+}
+
+function startBreak() {
+
+    saveBreakSettings();
+    updateBreakDurationUI();
+
+    gameState = "clickBreak";
+
+    clickAmount = 0;
+
+
+    document.getElementById(
+        "clickCounter"
+    ).textContent =
+        "0 / 35";
+
+
+    document.getElementById(
+        "clickScreen"
+    ).classList.remove(
+        "hidden"
+    );
+
+}
+
+
+/* ---------------- 35 CLICKS ---------------- */
+
+document.getElementById(
+    "clickButton"
+).onclick = function() {
+
+    if (
+        gameState !== "clickBreak"
+    )
+        return;
+
+
+    clickAmount++;
+
+
+    document.getElementById(
+        "clickCounter"
+    ).textContent =
+        clickAmount +
+        " / 35";
+
+
+    if (
+        clickAmount >= 35
+    ) {
+
+        document.getElementById(
+            "clickScreen"
+        ).classList.add(
+            "hidden"
+        );
+
+
+        document.getElementById(
+            "dragScreen"
+        ).classList.remove(
+            "hidden"
+        );
+
+
+        gameState =
+            "dragReady";
+    }
+
+};
+
+
+/* =====================================================
+   20 SECOND MOUSE DRAG
+===================================================== */
+
+let mouseIsDown = false;
+
+let dragging = false;
+
+let dragStartTime = 0;
+
+let dragDistance = 0;
+
+
+document.getElementById(
+    "startDrag"
+).onclick = function() {
+
+    if (
+        gameState !== "dragReady"
+    )
+        return;
+
+
+    gameState =
+        "dragging";
+
+
+    dragStartTime =
+        performance.now();
+
+
+    dragDistance = 0;
+
+
+    dragging =
+        mouseIsDown;
+
+
+    document.getElementById(
+        "startDrag"
+    ).style.display =
+        "none";
+
+
+    const sessionElapsedNow =
+        performance.now() - sessionStart;
+
+    const totalSeconds =
+        Math.floor(
+            sessionElapsedNow / 1000
+        );
+
+    const mins =
+        Math.floor(
+            totalSeconds / 60
+        );
+
+    const secs =
+        String(
+            totalSeconds % 60
+        ).padStart(2, "0");
+
+    document.getElementById(
+        "dragMessage"
+    ).textContent =
+        "you've been playing for " +
+        mins + ":" + secs;
+
+};
+
+
+window.addEventListener(
+    "mousedown",
+    function() {
+
+        mouseIsDown = true;
+
+        if (
+            gameState === "dragging"
+        ) {
+
+            dragging = true;
+
+        }
+
+    }
+);
+
+
+window.addEventListener(
+    "mouseup",
+    function() {
+
+        mouseIsDown = false;
+
+        dragging = false;
+
+    }
+);
+
+
+window.addEventListener(
+    "mousemove",
+    function(event) {
+
+        if (
+            gameState === "dragging" &&
+            (dragging || mouseIsDown)
+        ) {
+
+            dragDistance +=
+                Math.abs(
+                    event.movementX
+                ) +
+                Math.abs(
+                    event.movementY
+                );
+
+        }
+
+    }
+);
+
+
+/* =====================================================
+   FINISH BREAK
+===================================================== */
+
+function finishBreak() {
+
+    document.getElementById(
+        "dragScreen"
+    ).classList.add(
+        "hidden"
+    );
+
+
+    document.getElementById(
+        "startDrag"
+    ).style.display =
+        "";
+
+
+    document.getElementById(
+        "dragProgress"
+    ).style.width =
+        "0%";
+
+
+    document.getElementById(
+        "dragTimer"
+    ).textContent =
+        (breakDurationMinutes * 60) + "s";
+
+
+    /* nextBreak is set relative to session-elapsed time
+       (persists across deaths/restarts), 1 minute ahead. */
+
+    const sessionElapsedNow =
+        performance.now() - sessionStart;
+
+    nextBreak =
+        sessionElapsedNow + breakIntervalMinutes * 60000;
+
+
+    gameState =
+        "playing";
+
+
+    lastTime =
+        performance.now();
+
+}
+
+
+/* =====================================================
+   HUD
+===================================================== */
+
+function updateHUD() {
+
+    document.getElementById(
+        "score"
+    ).textContent =
+        Math.floor(score);
+
+
+    document.getElementById(
+        "coins"
+    ).textContent =
+        coins;
+
+
+    document.getElementById(
+        "best"
+    ).textContent =
+        best;
+
+
+    const elapsed =
+        performance.now() -
+        sessionStart;
+
+
+    const seconds =
+        Math.floor(
+            elapsed / 1000
+        );
+
+
+    const minutes =
+        Math.floor(
+            seconds / 60
+        );
+
+
+    const remaining =
+        String(
+            seconds % 60
+        ).padStart(
+            2,
+            "0"
+        );
+
+
+    document.getElementById(
+        "time"
+    ).textContent =
+        minutes +
+        ":" +
+        remaining;
+
+    document.getElementById("world").textContent = bgThemes[themeTier].name;
+
+}
+
+
+/* =====================================================
+   MAIN GAME LOOP
+===================================================== */
+
+function animate(now) {
+
+    requestAnimationFrame(
+        animate
+    );
+
+
+    const delta =
+        Math.min(
+            .05,
+            (now - lastTime) / 1000
+        );
+
+
+    lastTime = now;
+
+    updateThemeTransition(now);
+
+
+    /* ---------------------------------------------
+       PLAYING
+    --------------------------------------------- */
+
+    if (
+        gameState === "playing"
+    ) {
+
+        const elapsed =
+            now - runStart;
+
+        const sessionElapsed =
+            now - sessionStart;
+
+
+        /* SPEED INCREASE */
+
+        speed =
+            22 +
+            Math.min(
+                24,
+                elapsed / 10000
+            );
+
+
+        /* SCORE */
+
+        // Score is based on distance/survival, NOT coins.
+        // Keep it fractional internally so it actually increases every frame.
+        score += delta * speed * 0.7;
+
+
+        /* BACKGROUND THEME — new tier every 500 score */
+
+        const desiredTier =
+            Math.floor(score / 500) % bgThemes.length;
+
+        if (
+            desiredTier !== themeTier &&
+            !themeTransitioning
+        ) {
+
+            startThemeTransition(desiredTier);
+
+        }
+
+
+        /* SPAWN */
+
+        spawnTimer +=
+            delta * 1000;
+
+
+        const spawnRate =
+            Math.max(
+                360,
+                850 -
+                elapsed / 180
+            );
+
+
+        if (
+            spawnTimer >
+            spawnRate
+        ) {
+
+            spawnTimer = 0;
+
+            spawnPattern();
+
+        }
+
+
+        /* LANE MOVEMENT */
+
+        player.position.x +=
+            (
+                targetX -
+                player.position.x
+            ) *
+            Math.min(
+                1,
+                delta * 12
+            );
+
+
+        /* JUMP */
+
+        if (
+            jump > 0
+        ) {
+
+            jump +=
+                delta * 2.6;
+
+
+            player.position.y =
+                Math.sin(
+                    jump *
+                    Math.PI
+                ) * 1.5;
+
+
+            ball.rotation.x -=
+                delta * 8;
+
+
+            if (
+                jump >= 1
+            ) {
+
+                jump = 0;
+
+                player.position.y = 0;
+
+            }
+
+        }
+
+
+        /* SLIDE */
+
+        if (
+            slide > 0
+        ) {
+
+            slide -= delta;
+
+            ball.scale.y = .72;
+
+            ball.scale.x = 1.12;
+
+
+            if (
+                slide <= 0
+            ) {
+
+                ball.scale.y = 1;
+
+                ball.scale.x = 1;
+
+            }
+
+        }
+
+
+        /* ROLLING BALL */
+
+        if (
+            jump <= 0
+        ) {
+
+            ball.rotation.x -=
+                speed *
+                delta *
+                .08;
+
+        }
+
+
+        /* OBJECT MOVEMENT */
+
+        for (
+            let i =
+                objects.length - 1;
+
+            i >= 0;
+
+            i--
+        ) {
+
+            const object =
+                objects[i];
+
+
+            object.mesh.position.z +=
+                speed * delta;
+
+
+            /* COIN ROTATION */
+
+            if (
+                object.type ===
+                "coin"
+            ) {
+
+                object.mesh.rotation.y +=
+                    delta * 7;
+
+            }
+
+
+            /* MOVER — sweeps side to side across all three lanes */
+
+            if (
+                object.type ===
+                "mover"
+            ) {
+
+                object.mesh.position.x =
+                    Math.sin(
+                        now / 420 +
+                        object.moverPhase
+                    ) * 3.05;
+
+                object.mesh.rotation.y +=
+                    delta * 3;
+
+                object.mesh.rotation.x +=
+                    delta * 2;
+
+            }
+
+
+            /* COLLISION */
+
+            const distanceZ =
+                Math.abs(
+                    object.mesh.position.z -
+                    player.position.z
+                );
+
+
+            const distanceX =
+                Math.abs(
+                    object.mesh.position.x -
+                    player.position.x
+                );
+
+
+            if (
+                distanceZ < 1.15 &&
+                distanceX < 1.15
+            ) {
+
+                /* COIN */
+
+                if (
+                    object.type ===
+                    "coin"
+                ) {
+
+                    coins++;
+                    // Collectibles are optional; score comes from surviving and running, not coins.
+
+
+                    scene.remove(
+                        object.mesh
+                    );
+
+
+                    objects.splice(
+                        i,
+                        1
+                    );
+
+
+                    continue;
+
+                }
+
+
+                /* LOW OBSTACLE — jump or duck under it */
+
+                if (
+                    object.type === "low" &&
+                    (
+                        jump > 0 ||
+                        slide > 0
+                    )
+                ) {
+
+                    /* don't remove it here — let it keep moving
+                       and get cleaned up (and scored) naturally
+                       once it passes behind the player, same as
+                       any obstacle you dodged by lane. Removing
+                       it mid-air made it visually vanish under
+                       your feet, which read as a glitch. */
+
+                    continue;
+
+                }
+
+
+                /* BEAM — overhead bar, duck only (jumping does NOT
+                   clear it — this is the obstacle that actually
+                   requires the slide control, so players are forced
+                   to discover and use it) */
+
+                if (
+                    object.type === "beam" &&
+                    slide > 0
+                ) {
+
+                    continue;
+
+                }
+
+
+                /* NORMAL OBSTACLE — jump over it */
+
+                if (
+                    object.type === "block" &&
+                    jump > 0
+                ) {
+
+                    continue;
+
+                }
+
+
+                gameOverScreen();
+
+                break;
+
+            }
+
+
+            /* REMOVE OLD OBJECT */
+
+            if (
+                object.mesh.position.z >
+                10
+            ) {
+
+                scene.remove(
+                    object.mesh
+                );
+
+
+                objects.splice(
+                    i,
+                    1
+                );
+
+            }
+
+        }
+
+
+        /* MOVE 3D SCENERY TOWARD THE PLAYER */
+        for (const env of environmentObjects) {
+            env.position.z += speed * delta;
+            if (env.position.z > 12) env.position.z -= 238;
+        }
+
+        /* 1 MINUTE BREAK — based on total session time,
+           not per-run time, so dying doesn't reset it */
+
+        if (
+            sessionElapsed >= nextBreak
+        ) {
+
+            startBreak();
+
+        }
+
+
+        updateHUD();
+
+    }
+
+
+    /* ---------------------------------------------
+       DRAG BREAK
+    --------------------------------------------- */
+
+    if (
+        gameState === "dragging"
+    ) {
+
+        const elapsed =
+            now -
+            dragStartTime;
+
+
+        const progress =
+            Math.min(
+                1,
+                elapsed / (breakDurationMinutes * 60000)
+            );
+
+
+        document.getElementById(
+            "dragProgress"
+        ).style.width =
+            (
+                progress * 100
+            ) + "%";
+
+
+        const secondsLeft =
+            Math.max(
+                0,
+                breakDurationMinutes * 60 -
+                Math.floor(
+                    elapsed / 1000
+                )
+            );
+
+
+        document.getElementById(
+            "dragTimer"
+        ).textContent =
+            secondsLeft +
+            "s";
+
+
+        if (
+            elapsed >= breakDurationMinutes * 60000
+        ) {
+
+            finishBreak();
+
+        }
+
+    }
+
+
+    /* ---------------------------------------------
+       CAMERA
+    --------------------------------------------- */
+
+    camera.position.x +=
+        (
+            player.position.x * .22 -
+            camera.position.x
+        ) *
+        delta *
+        4;
+
+
+    camera.lookAt(
+        player.position.x * .18,
+        1,
+        -12
+    );
+
+
+    renderer.render(
+        scene,
+        camera
+    );
+
+}
+
+
+/* =====================================================
+   START / RESTART BUTTONS
+===================================================== */
+
+document.getElementById(
+    "startButton"
+).onclick =
+    startGame;
+
+
+document.getElementById(
+    "restartButton"
+).onclick =
+    startGame;
+
+
+/* =====================================================
+   SHOP
+===================================================== */
+
+let shopReturnScreenId = "startScreen";
+
+function updateWalletDisplays() {
+
+    document.getElementById(
+        "startWallet"
+    ).textContent =
+        "wallet: " + wallet + " coins";
+
+    document.getElementById(
+        "shopWallet"
+    ).textContent =
+        "you have " + wallet + " coins";
+
+}
+
+function renderShop() {
+
+    const list =
+        document.getElementById("shopList");
+
+    list.innerHTML = "";
+
+    skins.forEach(skin => {
+
+        const owned = ownedSkins.includes(skin.id);
+        const equipped = equippedSkin === skin.id;
+        const affordable = wallet >= skin.cost;
+
+        const row = document.createElement("div");
+        row.style.display = "flex";
+        row.style.justifyContent = "space-between";
+        row.style.alignItems = "center";
+        row.style.padding = "10px 14px";
+        row.style.borderRadius = "10px";
+        row.style.background = "rgba(255,255,255,0.06)";
+
+        const label = document.createElement("div");
+        label.innerHTML =
+            "<div style='font-weight:bold;'>" + skin.name +
+            " <span style='font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:" +
+            rarityColors[skin.rarity] + "; margin-left:6px;'>" + skin.rarity + "</span>" +
+            "</div>" +
+            "<div style='opacity:.55; font-size:12px;'>" +
+            (skin.cost === 0 ? "free" : skin.cost + " coins") +
+            "</div>";
+
+        const btn = document.createElement("button");
+        btn.className = "mainButton";
+        btn.style.margin = "0";
+        btn.style.padding = "8px 16px";
+        btn.style.fontSize = "13px";
+
+        if (equipped) {
+            btn.textContent = "EQUIPPED";
+            btn.disabled = true;
+            btn.style.opacity = ".5";
+        } else if (owned) {
+            btn.textContent = "EQUIP";
+            btn.onclick = () => { applySkin(skin.id); renderShop(); };
+        } else {
+            btn.textContent = affordable ? "BUY" : "LOCKED";
+            btn.disabled = !affordable;
+            btn.style.opacity = affordable ? "1" : ".4";
+            btn.onclick = () => {
+                if (wallet < skin.cost) return;
+                wallet -= skin.cost;
+                ownedSkins.push(skin.id);
+                localStorage.breakRunnerWallet = wallet;
+                localStorage.breakRunnerOwned = JSON.stringify(ownedSkins);
+                applySkin(skin.id);
+                renderShop();
+                updateWalletDisplays();
+            };
+        }
+
+        row.appendChild(label);
+        row.appendChild(btn);
+        list.appendChild(row);
+
+    });
+
+}
+
+function openShop(fromId) {
+    shopReturnScreenId = fromId;
+    document.getElementById(fromId).classList.add("hidden");
+    updateWalletDisplays();
+    renderShop();
+    document.getElementById("shopScreen").classList.remove("hidden");
+}
+
+loadBreakSettings();
+
+document.getElementById(
+    "shopFromStartButton"
+).onclick = () => openShop("startScreen");
+
+document.getElementById(
+    "shopFromGameOverButton"
+).onclick = () => openShop("gameOver");
+
+document.getElementById(
+    "shopBackButton"
+).onclick = () => {
+    document.getElementById("shopScreen").classList.add("hidden");
+    document.getElementById(shopReturnScreenId).classList.remove("hidden");
+};
+
+
+/* =====================================================
+   INITIAL STATE
+===================================================== */
+
+updateWalletDisplays();
+
+applySkin(equippedSkin);
+
+
+document.getElementById(
+    "best"
+).textContent =
+    best;
+
+
+requestAnimationFrame(
+    animate
+);
+
+
+/* =====================================================
+   WINDOW RESIZE
+===================================================== */
+
+window.addEventListener(
+    "resize",
+    function() {
+
+        camera.aspect =
+            window.innerWidth /
+            window.innerHeight;
+
+
+        camera.updateProjectionMatrix();
+
+
+        renderer.setSize(
+            window.innerWidth,
+            window.innerHeight
+        );
+
+    }
+);
+
+</script>
+
+
+<style>
+#editTimeModal{display:none;position:fixed;inset:0;z-index:10000;background:rgba(8,10,18,.72);align-items:center;justify-content:center}
+#editTimeModal .time-card{width:min(430px,90vw);padding:26px;border-radius:20px;background:#171b27;color:#fff;border:1px solid rgba(255,255,255,.18);box-shadow:0 24px 70px rgba(0,0,0,.5);font-family:Arial,sans-serif}
+#editTimeModal h2{margin:0 0 22px}
+#editTimeModal label{display:block;margin:18px 0 7px}
+#editTimeModal input[type=range]{width:100%}
+#editTimeModal .time-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
+#editTimeModal button{padding:9px 16px;border-radius:10px;border:1px solid #555;background:#252b3a;color:white;cursor:pointer}
+#editTimeModal #saveTimeEdit{background:#fff;color:#111}
+</style>
+<div id="editTimeModal">
+  <div class="time-card">
+    <h2>Edit Break Time</h2>
+    <label>Run before break: <strong><span id="runTimeValue">5</span> min</strong></label>
+    <input id="runTimeEdit" type="range" min="1" max="10" step="1" value="5">
+    <label>Break length: <strong><span id="breakLengthValue">1</span> min</strong></label>
+    <input id="breakLengthEdit" type="range" min="1" max="30" step="1" value="1">
+    <div class="time-actions">
+      <button id="cancelTimeEdit" type="button">Cancel</button>
+      <button id="saveTimeEdit" type="button">Save</button>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const modal=$('editTimeModal'), open=$('edit-time-btn');
+  if(!modal||!open) return;
+  const run=$('runTimeEdit'), brk=$('breakLengthEdit');
+  const rv=$('runTimeValue'), bv=$('breakLengthValue');
+
+  function load(){
+    run.value=localStorage.getItem('runnerRunMinutes')||'5';
+    brk.value=localStorage.getItem('runnerBreakMinutes')||'1';
+    rv.textContent=run.value; bv.textContent=brk.value;
+  }
+  load();
+  run.oninput=()=>rv.textContent=run.value;
+  brk.oninput=()=>bv.textContent=brk.value;
+  open.onclick=()=>{load(); modal.style.display='flex';};
+  $('cancelTimeEdit').onclick=()=>modal.style.display='none';
+  $('saveTimeEdit').onclick=()=>{
+    localStorage.setItem('runnerRunMinutes',run.value);
+    localStorage.setItem('runnerBreakMinutes',brk.value);
+    window.breakSettings={runMinutes:Number(run.value),breakMinutes:Number(brk.value)};
+    document.dispatchEvent(new CustomEvent('breakSettingsChanged',{detail:window.breakSettings}));
+    modal.style.display='none';
+  };
+})();
+</script>
+
+
+<script>
+window.getBreakSettings = window.getBreakSettings || function(){
+  return {
+    runMinutes: Math.min(10, Math.max(1, Number(localStorage.getItem('runnerRunMinutes') || 5))),
+    breakMinutes: Math.min(30, Math.max(1, Number(localStorage.getItem('runnerBreakMinutes') || 1)))
+  };
+};
+</script>
+
+</body>
+</html>
